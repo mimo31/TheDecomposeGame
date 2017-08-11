@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:orientation="vertical"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:weightSum="1"
+    android:background="#bfffff00"
+    tools:context=".PlayActivity">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceLarge"
+        android:text="Congratulations!"
+        android:id="@+id/congratulationsText"
+        android:layout_above="@+id/timeText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginBottom="47dp"
+        android:autoText="false"
+        android:textColor="#000000" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="You&apos;ve finished this level in 0 seconds."
+        android:id="@+id/timeText"
+        android:layout_centerVertical="true"
+        android:layout_centerHorizontal="true"
+        android:textColor="#000000" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="EXIT"
+        android:id="@+id/exitButton"
+        android:layout_alignTop="@+id/nextLevelButton"
+        android:layout_alignLeft="@+id/timeText"
+        android:layout_alignStart="@+id/timeText"
+        android:onClick="exitTheGame"/>
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="NEXT LEVEL"
+        android:id="@+id/nextLevelButton"
+        android:layout_marginTop="39dp"
+        android:layout_below="@+id/bestText"
+        android:layout_alignRight="@+id/timeText"
+        android:layout_alignEnd="@+id/timeText"
+        android:onClick="goToNextLevel"/>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="That&apos;s a new best time!"
+        android:id="@+id/bestText"
+        android:layout_below="@+id/timeText"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="28dp"
+        android:textColor="#000000" />
+
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="REPLAY"
+        android:id="@+id/replayButton"
+        android:layout_alignTop="@+id/nextLevelButton"
+        android:layout_centerHorizontal="true"
+        android:onClick="replay"
+        android:nestedScrollingEnabled="false" />
+</RelativeLayout>
