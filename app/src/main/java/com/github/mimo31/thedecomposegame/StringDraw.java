@@ -388,7 +388,7 @@ public class StringDraw
      * @param borderSize the size of the border to take away form the rectangle
      * @return a new, reduced rectangle
      */
-    private static Rect applyBorders(Rect original, int borderSize)
+    public static Rect applyBorders(Rect original, int borderSize)
     {
         return new Rect(original.left + borderSize, original.top + borderSize, original.right - borderSize, original.bottom - borderSize);
     }
