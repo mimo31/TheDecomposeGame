@@ -221,11 +221,12 @@ public class StartActivity extends AppCompatActivity
 
         /**
          * Draws a tile including the state change animation if appropriate.
-         * @param screenX the x location of the tile in the view coordinates
-         * @param screenY the y location of the tile in the view coordinates
-         * @param state the state of the tile
+         *
+         * @param screenX        the x location of the tile in the view coordinates
+         * @param screenY        the y location of the tile in the view coordinates
+         * @param state          the state of the tile
          * @param toAnimationEnd the time remaining to the end of the animation of the tile; set to 0 if the tile should not be animated
-         * @param canvas the canvas to draw on
+         * @param canvas         the canvas to draw on
          */
         private void drawTile(int screenX, int screenY, boolean state, int toAnimationEnd, Canvas canvas)
         {

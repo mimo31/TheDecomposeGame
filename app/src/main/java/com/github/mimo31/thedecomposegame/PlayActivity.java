@@ -968,8 +968,8 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
         int spaceWidth = right - left;
         int spaceHeight = bottom - top;
-        int tileWidth = clickField.getTotalWidth();
-        int tileHeight = clickField.getTotalHeight();
+        int tileWidth = clickField.width;
+        int tileHeight = clickField.height;
 
         // the size of one drawn tile of the ClickField
         float fieldSize;
@@ -977,7 +977,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
         if (spaceWidth / (float) spaceHeight > tileWidth / (float) tileHeight)
         {
             fieldSize = spaceHeight / (float) tileHeight;
-            originX = (int) ((spaceWidth - clickField.getTotalWidth() * fieldSize) / 2) + left;
+            originX = (int) ((spaceWidth - tileWidth * fieldSize) / 2) + left;
             originY = top;
         }
         else
@@ -995,7 +995,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             for (int j = 0; j < tileHeight; j++)
             {
                 // whether this is the click position - the green square should be drawn
-                boolean isClickPosition = clickField.getClickX() == i && clickField.getClickY() == j;
+                boolean isClickPosition = clickField.clickX == i && clickField.clickY == j;
 
                 // whether this is a part of the ClickField - it should be drawn red
                 boolean isChangedOnClick = clickField.getInAbsoluteCoordinates(i, j);
