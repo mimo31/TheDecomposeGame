@@ -18,6 +18,10 @@ import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
+/**
+ * The activity containing the main play area. Contains the tile grid, a ClickField selection dialog.
+ * Includes the pause and finished dialogs.
+ */
 public class PlayActivity extends AppCompatActivity implements Runnable
 {
     // the view with the tile grid, ClickField selection etc.
@@ -33,8 +37,8 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     private int level;
 
     // the colors of the tiles on the grid
-    private final int goodColor = Color.BLUE;
-    private final int badColor = Color.RED;
+    public static final int goodColor = Color.BLUE;
+    public static final int badColor = Color.RED;
 
     // handles the updating of animation in the Activity
     private Handler updateHandler = new Handler();
@@ -170,7 +174,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     {
         super.onRestoreInstanceState(savedInstanceState);
         this.level = savedInstanceState.getInt("level");
-        this.state = (PlayState)savedInstanceState.getSerializable("state");
+        this.state = (PlayState) savedInstanceState.getSerializable("state");
         this.gameDesk = savedInstanceState.getParcelable("desk");
         this.millisTaken = savedInstanceState.getInt("millisTaken");
         if (this.state != PlayState.PLAYING)
@@ -197,6 +201,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
     /**
      * Sets the position of the dialog layout. Used for showing and hiding the dialog view.
+     *
      * @param position the position of the dialog to set (from 0.0 to 1.0)
      */
     private void updateDialogPosition(float position)
@@ -206,7 +211,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     }
 
     /**
-     * @param state the state of the animation from 0.0 to 1.0
+     * @param state        the state of the animation from 0.0 to 1.0
      * @param initialSpeed a value corresponding to the rate of change at the beginning of the animation
      * @return the current position calculated using a cubic curve with values between 0.0 and 1.0
      */
@@ -332,6 +337,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
     /**
      * Handles the press of the next level button or the resume button (depending on whether the dialog is pause or finished).
+     *
      * @param v the view that caused the call
      */
     public void nextLevelOrResumePress(View v)
@@ -364,6 +370,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
     /**
      * Handles the press of the exit button.
+     *
      * @param v the view that caused the call
      */
     public void exitTheGame(View v)
@@ -376,6 +383,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
     /**
      * Handles the press of the replay button.
+     *
      * @param v the view that caused the call
      */
     public void replay(View v)
@@ -526,7 +534,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
                 int selectionSpaceWidth = this.width;
                 int selectionSpaceHeight = (this.height - playYStart) / 5;
-                if (selectionSpaceWidth / (float)selectionSpaceHeight > 3)
+                if (selectionSpaceWidth / (float) selectionSpaceHeight > 3)
                 {
                     this.selectionSquareSize = selectionSpaceHeight;
                     this.curSelectionStartX = width / 2 - this.selectionSquareSize / 2;
@@ -551,7 +559,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
                 int selectionSpaceWidth = this.width / 5;
                 int selectionSpaceHeight = this.height - playYStart;
-                if (selectionSpaceHeight / (float)selectionSpaceWidth > 3)
+                if (selectionSpaceHeight / (float) selectionSpaceWidth > 3)
                 {
                     this.selectionSquareSize = selectionSpaceWidth;
                     this.prevSelectionStartX = this.curSelectionStartX = this.nextSelectionStartX = this.width - selectionSpaceWidth;
@@ -575,17 +583,17 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             // calculates the size of one tile on the GameDesk and the location of the GameDesk
             this.tilesInWidth = this.attachedActivity.gameDesk.width;
             this.tilesInHeight = this.attachedActivity.gameDesk.height;
-            float gridWidthToHeight = this.tilesInWidth / (float)this.tilesInHeight;
-            if (gridWidthToHeight > this.gridSpaceWidth / (float)this.gridSpaceHeight)
+            float gridWidthToHeight = this.tilesInWidth / (float) this.tilesInHeight;
+            if (gridWidthToHeight > this.gridSpaceWidth / (float) this.gridSpaceHeight)
             {
-                this.tileSize = this.gridSpaceWidth / (float)this.tilesInWidth;
+                this.tileSize = this.gridSpaceWidth / (float) this.tilesInWidth;
                 this.gridCornerX = 0;
-                this.gridCornerY = playYStart + this.gridSpaceHeight / 2 - (int)(this.tileSize * this.tilesInHeight / 2);
+                this.gridCornerY = playYStart + this.gridSpaceHeight / 2 - (int) (this.tileSize * this.tilesInHeight / 2);
             }
             else
             {
-                this.tileSize = this.gridSpaceHeight / (float)this.tilesInHeight;
-                this.gridCornerX = this.gridSpaceWidth / 2 - (int)(this.tileSize * this.tilesInWidth / 2);
+                this.tileSize = this.gridSpaceHeight / (float) this.tilesInHeight;
+                this.gridCornerX = this.gridSpaceWidth / 2 - (int) (this.tileSize * this.tilesInWidth / 2);
                 this.gridCornerY = playYStart;
             }
 
@@ -610,17 +618,17 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             // calculates the size of one tile on the GameDesk and the location of the GameDesk
             this.tilesInWidth = this.attachedActivity.gameDesk.width;
             this.tilesInHeight = this.attachedActivity.gameDesk.height;
-            float gridWidthToHeight = this.tilesInWidth / (float)this.tilesInHeight;
-            if (gridWidthToHeight > gridSpaceWidth / (float)gridSpaceHeight)
+            float gridWidthToHeight = this.tilesInWidth / (float) this.tilesInHeight;
+            if (gridWidthToHeight > gridSpaceWidth / (float) gridSpaceHeight)
             {
-                this.tileSize = gridSpaceWidth / (float)this.tilesInWidth;
+                this.tileSize = gridSpaceWidth / (float) this.tilesInWidth;
                 this.gridCornerX = 0;
-                this.gridCornerY = playYStart + gridSpaceHeight / 2 - (int)(this.tileSize * this.tilesInHeight / 2);
+                this.gridCornerY = playYStart + gridSpaceHeight / 2 - (int) (this.tileSize * this.tilesInHeight / 2);
             }
             else
             {
-                this.tileSize = gridSpaceHeight / (float)this.tilesInHeight;
-                this.gridCornerX = gridSpaceWidth / 2 - (int)(this.tileSize * this.tilesInWidth / 2);
+                this.tileSize = gridSpaceHeight / (float) this.tilesInHeight;
+                this.gridCornerX = gridSpaceWidth / 2 - (int) (this.tileSize * this.tilesInWidth / 2);
                 this.gridCornerY = playYStart;
             }
 
@@ -691,7 +699,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             this.p.setTypeface(Typeface.MONOSPACE);
             if (this.timeInfoDraw == null || this.calibrationLimit <= millisecondsTaken / 1000)
             {
-                int digCount = millisecondsTaken < 1000 ? 1 : (int)Math.floor(Math.log10(millisecondsTaken / 1000)) + 1;
+                int digCount = millisecondsTaken < 1000 ? 1 : (int) Math.floor(Math.log10(millisecondsTaken / 1000)) + 1;
                 this.timeInfoDraw = StringDraw.getMaxStringData(millisecondsTaken / 1000 + " s", this.timeInfoBounds, StringDraw.TextAlign.MIDDLE, this.p);
                 this.calibrationLimit = 1;
                 for (int i = 0; i < digCount; i++)
@@ -706,7 +714,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             // update the animation of the grid
             if (this.attachedActivity.gameDesk.isAnimating)
             {
-                float animState = (System.currentTimeMillis() - this.attachedActivity.gameDesk.animationBegin) / (float)GameDesk.animationLength;
+                float animState = (System.currentTimeMillis() - this.attachedActivity.gameDesk.animationBegin) / (float) GameDesk.animationLength;
                 if (animState > 1)
                 {
                     this.attachedActivity.gameDesk.isAnimating = false;
@@ -795,19 +803,19 @@ public class PlayActivity extends AppCompatActivity implements Runnable
                         int centerY = this.prevSelectionStartY + this.selectionSquareSize / 2;
                         drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 1], centerX - size / 2, centerY - size / 2, centerX + size / 2, centerY + size / 2, canvas, this.p);
                     }
-                    int movInCenterX = this.prevSelectionStartX + this.selectionSquareSize / 2 + (int)((this.curSelectionStartX - this.prevSelectionStartX) * this.choiceState * this.choiceState);
-                    int movInCenterY = this.prevSelectionStartY + this.selectionSquareSize / 2 + (int)((this.curSelectionStartY - this.prevSelectionStartY) * this.choiceState * this.choiceState);
-                    int movInSize = this.selectionSquareSize - 4 * border + (int)(2 * border * this.choiceState * this.choiceState);
+                    int movInCenterX = this.prevSelectionStartX + this.selectionSquareSize / 2 + (int) ((this.curSelectionStartX - this.prevSelectionStartX) * this.choiceState * this.choiceState);
+                    int movInCenterY = this.prevSelectionStartY + this.selectionSquareSize / 2 + (int) ((this.curSelectionStartY - this.prevSelectionStartY) * this.choiceState * this.choiceState);
+                    int movInSize = this.selectionSquareSize - 4 * border + (int) (2 * border * this.choiceState * this.choiceState);
                     drawClickField(ClickField.availableClickFields[ClickField.selectedClickField], movInCenterX - movInSize / 2, movInCenterY - movInSize / 2, movInCenterX + movInSize / 2, movInCenterY + movInSize / 2, canvas, this.p);
                     if (ClickField.selectedClickField != ClickField.availableClickFields.length - 1)
                     {
                         int movOutCenterX = movInCenterX + this.curSelectionStartX - this.prevSelectionStartX;
                         int movOutCenterY = movInCenterY + this.curSelectionStartY - this.prevSelectionStartY;
-                        int movOutSize = this.selectionSquareSize - 2 * border - (int)(2 * border * this.choiceState * this.choiceState);
+                        int movOutSize = this.selectionSquareSize - 2 * border - (int) (2 * border * this.choiceState * this.choiceState);
                         drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 1], movOutCenterX - movOutSize / 2, movOutCenterY - movOutSize / 2, movOutCenterX + movOutSize / 2, movOutCenterY + movOutSize / 2, canvas, this.p);
                         if (ClickField.selectedClickField != ClickField.availableClickFields.length - 2)
                         {
-                            int popOutSize = (int)((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
+                            int popOutSize = (int) ((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
                             int popOutRad = popOutSize / 2;
                             int popOutCenterX = this.nextSelectionStartX + this.selectionSquareSize / 2;
                             int popOutCenterY = this.nextSelectionStartY + this.selectionSquareSize / 2;
@@ -825,19 +833,19 @@ public class PlayActivity extends AppCompatActivity implements Runnable
                         int centerY = this.nextSelectionStartY + this.selectionSquareSize / 2;
                         drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 1], centerX - size / 2, centerY - size / 2, centerX + size / 2, centerY + size / 2, canvas, this.p);
                     }
-                    int movInCenterX = this.nextSelectionStartX + this.selectionSquareSize / 2 - (int)((this.nextSelectionStartX - this.curSelectionStartX) * this.choiceState * this.choiceState);
-                    int movInCenterY = this.nextSelectionStartY + this.selectionSquareSize / 2 - (int)((this.nextSelectionStartY - this.curSelectionStartY) * this.choiceState * this.choiceState);
-                    int movInSize = this.selectionSquareSize - 4 * border + (int)(2 * border * this.choiceState * this.choiceState);
+                    int movInCenterX = this.nextSelectionStartX + this.selectionSquareSize / 2 - (int) ((this.nextSelectionStartX - this.curSelectionStartX) * this.choiceState * this.choiceState);
+                    int movInCenterY = this.nextSelectionStartY + this.selectionSquareSize / 2 - (int) ((this.nextSelectionStartY - this.curSelectionStartY) * this.choiceState * this.choiceState);
+                    int movInSize = this.selectionSquareSize - 4 * border + (int) (2 * border * this.choiceState * this.choiceState);
                     drawClickField(ClickField.availableClickFields[ClickField.selectedClickField], movInCenterX - movInSize / 2, movInCenterY - movInSize / 2, movInCenterX + movInSize / 2, movInCenterY + movInSize / 2, canvas, this.p);
                     if (ClickField.selectedClickField != 0)
                     {
                         int movOutCenterX = movInCenterX - (this.curSelectionStartX - this.prevSelectionStartX);
                         int movOutCenterY = movInCenterY - (this.curSelectionStartY - this.prevSelectionStartY);
-                        int movOutSize = this.selectionSquareSize - 2 * border - (int)(2 * border * this.choiceState * this.choiceState);
+                        int movOutSize = this.selectionSquareSize - 2 * border - (int) (2 * border * this.choiceState * this.choiceState);
                         drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 1], movOutCenterX - movOutSize / 2, movOutCenterY - movOutSize / 2, movOutCenterX + movOutSize / 2, movOutCenterY + movOutSize / 2, canvas, this.p);
                         if (ClickField.selectedClickField != 1)
                         {
-                            int popOutSize = (int)((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
+                            int popOutSize = (int) ((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
                             int popOutRad = popOutSize / 2;
                             int popOutCenterX = this.prevSelectionStartX + this.selectionSquareSize / 2;
                             int popOutCenterY = this.prevSelectionStartY + this.selectionSquareSize / 2;
@@ -941,13 +949,14 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
     /**
      * Draws a ClickField as a maximized rectangle in the specified rectangle.
+     *
      * @param clickField the ClickField to draw
-     * @param left left of the rectangle
-     * @param top top of the rectangle
-     * @param right right of the rectangle
-     * @param bottom bottom of the rectangle
-     * @param canvas the canvas to draw on
-     * @param p the paint to draw with
+     * @param left       left of the rectangle
+     * @param top        top of the rectangle
+     * @param right      right of the rectangle
+     * @param bottom     bottom of the rectangle
+     * @param canvas     the canvas to draw on
+     * @param p          the paint to draw with
      */
     private static void drawClickField(ClickField clickField, int left, int top, int right, int bottom, Canvas canvas, Paint p)
     {
@@ -968,7 +977,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
         if (spaceWidth / (float) spaceHeight > tileWidth / (float) tileHeight)
         {
             fieldSize = spaceHeight / (float) tileHeight;
-            originX = (int)((spaceWidth - clickField.getTotalWidth() * fieldSize) / 2) + left;
+            originX = (int) ((spaceWidth - clickField.getTotalWidth() * fieldSize) / 2) + left;
             originY = top;
         }
         else
@@ -979,7 +988,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
         }
 
         // border between the tiles
-        int border = (int)fieldSize / 10;
+        int border = (int) fieldSize / 10;
 
         for (int i = 0; i < tileWidth; i++)
         {

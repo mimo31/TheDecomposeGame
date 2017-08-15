@@ -5,7 +5,7 @@ import android.os.Parcelable;
 
 /**
  * Created by Viktor on 1/22/2016.
- *
+ * <p>
  * Handles the data about the tile grid shown to the player including the animations.
  */
 public class GameDesk implements Parcelable
@@ -59,7 +59,8 @@ public class GameDesk implements Parcelable
     /**
      * Constructs a new GameDesk with the specified tile states.
      * Copies the states into a new array, so the passed array remains unchanged.
-     * @param width width of the tile grid
+     *
+     * @param width  width of the tile grid
      * @param height height of the tile grid
      * @param states the states for the new GameDesk
      */
@@ -86,9 +87,10 @@ public class GameDesk implements Parcelable
      * Checks whether applying a ClickField at a specified location is valid.
      * If yes, applies the ClickField which results in changing the state of the corresponding tiles and starting an animation.
      * In no, does nothing.
+     *
      * @param field the ClickField to apply
-     * @param x the x coordinate of the tile to apply the field on
-     * @param y the y coordinate of the tile to apply the field on
+     * @param x     the x coordinate of the tile to apply the field on
+     * @param y     the y coordinate of the tile to apply the field on
      * @return whether the application was valid - whether the ClickField was applied
      */
     public boolean doAttempt(ClickField field, int x, int y)
