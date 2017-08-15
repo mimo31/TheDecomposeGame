@@ -1,20 +1,16 @@
 package com.github.mimo31.thedecomposegame;
 
-import android.content.Intent;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
 import android.graphics.Path;
-import android.graphics.Point;
 import android.graphics.Rect;
-import android.opengl.Visibility;
+import android.graphics.Typeface;
 import android.os.Handler;
 import android.support.v4.view.GestureDetectorCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.view.GestureDetector;
-import android.view.Gravity;
-import android.view.KeyEvent;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
@@ -22,501 +18,998 @@ import android.widget.Button;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
 
-public class PlayActivity extends AppCompatActivity implements Runnable {
-
+public class PlayActivity extends AppCompatActivity implements Runnable
+{
+    // the view with the tile grid, ClickField selection etc.
     private GameView plane;
+
+    // the GameDesk with the current grid
     private GameDesk gameDesk;
-    private RelativeLayout finishedLayout;
+
+    // the view - layout with serving as a pause and level finished dialog
+    private RelativeLayout dialogLayout;
+
+    // the number of the level that is currently being played
     private int level;
+
+    // the colors of the tiles on the grid
     private final int goodColor = Color.BLUE;
     private final int badColor = Color.RED;
-    private float finishedLayoutState;
-    private boolean showingFinished;
-    private boolean hidingFinished;
+
+    // handles the updating of animation in the Activity
     private Handler updateHandler = new Handler();
-    private long levelStartTime;
+
+    // if we are currently counting the time to the time taken by the user for the level, this value is the time when we started the counting
+    // the total time taken up to this point is then System.currentTimeMillis() - timerLastStart + millisTaken
+    // if we are currently not counting the time, this value is set to 0
+    private long timerLastStart;
+
+    // the total time taken by the user for this level not including the time after the last pause (see also the timerLastStart field)
     private int millisTaken = 0;
+
+    // indicates whether this is the new best time for this level, only relevant when showing the finished dialog
     private boolean isBest = false;
+
+    // indicates whether a next level is available and thus we should show the next level button, only relevant when showing the finished dialog
     private boolean showNextLevelButton = false;
-    private boolean paused;
+
+    // indicates the current state of the Activity
+    private PlayState state;
+
+    // the state of showing or hiding the dialog
+    // 0.0 - animation start
+    // 1.0 - animation end
+    private float animationState;
+
+    // indicates whether the current dialog is the paused dialog
+    // should be false when state == PlayState.PLAYING
+    private boolean paused = false;
+
+    // indicates whether the current dialog is the finished dialog
+    // should be false when state == PlayState.PLAYING
+    private boolean finished = false;
 
     @Override
-    protected void onCreate(Bundle savedInstanceState) {
+    protected void onCreate(Bundle savedInstanceState)
+    {
         super.onCreate(savedInstanceState);
         this.plane = new GameView(this);
-        this.finishedLayout = (RelativeLayout) this.getLayoutInflater().inflate(R.layout.finished_appearance, null);
+        this.dialogLayout = (RelativeLayout) this.getLayoutInflater().inflate(R.layout.finished_and_pause, null);
         ViewGroup.LayoutParams layoutParams = new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
         this.addContentView(this.plane, layoutParams);
-        this.addContentView(this.finishedLayout, layoutParams);
-        if (savedInstanceState == null) {
+        this.addContentView(this.dialogLayout, layoutParams);
+
+        // if there is no saved state, get the level from intent and start playing
+        // otherwise, the data are being initialized in the onRestoreInstanceState method
+        if (savedInstanceState == null)
+        {
             this.level = this.getIntent().getIntExtra("level", 0);
-            this.gameDesk = Level.levels[this.level].getFreeDesk();
+            this.gameDesk = Level.levels[this.level].getNewDesk();
             ClickField.availableClickFields = Level.levels[this.level].allowedClickFields;
             ClickField.selectedClickField = 0;
-            this.levelStartTime = System.currentTimeMillis();
+            this.state = PlayState.PLAYING;
         }
-        else {
-            this.level = savedInstanceState.getInt("level");
-            this.gameDesk = savedInstanceState.getParcelable("state");
-            this.levelStartTime = savedInstanceState.getLong("startTime");
-            this.finishedLayoutState = savedInstanceState.getFloat("finishedState");
-            this.showingFinished = savedInstanceState.getBoolean("showingFinished");
-            this.hidingFinished = savedInstanceState.getBoolean("hidingFinished");
-            this.paused = savedInstanceState.getBoolean("paused");
-            if (this.finishedLayoutState != 0) {
-                if (this.paused) {
-                    this.updatePauseLayout();
+
+        // set the position of the dialog layout but after the dialog is loaded
+        this.dialogLayout.post(new Runnable()
+        {
+
+            @Override
+            public void run()
+            {
+                if (state == PlayState.PLAYING)
+                {
+                    updateDialogPosition(0.0f);
                 }
-                else {
-                    this.millisTaken = savedInstanceState.getInt("timeTaken");
-                    this.isBest = savedInstanceState.getBoolean("isBest");
-                    this.showNextLevelButton = savedInstanceState.getBoolean("showNextButton");
-                    this.updateFinishedData();
+                else if (state == PlayState.DIALOG)
+                {
+                    updateDialogPosition(1.0f);
                 }
+            }
+
+        });
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle state)
+    {
+        super.onSaveInstanceState(state);
+        state.putInt("level", this.level);
+        state.putSerializable("state", this.state);
+        state.putParcelable("desk", this.gameDesk);
+        state.putInt("millisTaken", this.millisTaken);
+        if (this.state != PlayState.PLAYING)
+        {
+            state.putBoolean("paused", this.paused);
+            state.putBoolean("finished", this.finished);
+            if (this.state != PlayState.DIALOG)
+            {
+                state.putFloat("animationState", this.animationState);
+            }
+            if (this.finished)
+            {
+                state.putBoolean("isBest", this.isBest);
+                state.putBoolean("showNextLevelButton", this.showNextLevelButton);
             }
         }
     }
 
     @Override
-    public void onWindowFocusChanged(boolean hasFocus) {
-        super.onWindowFocusChanged(hasFocus);
-        this.updateFinishedPosition();
-        addMargins((TextView) this.finishedLayout.findViewById(R.id.timeText), this.finishedLayout.getWidth());
-        addMargins((TextView) this.finishedLayout.findViewById(R.id.bestText), this.finishedLayout.getWidth());
+    protected void onPause()
+    {
+        super.onPause();
+        if (this.state == PlayState.PLAYING)
+        {
+            // pause the time
+            this.millisTaken += System.currentTimeMillis() - this.timerLastStart;
+            this.timerLastStart = 0;
+        }
     }
 
     @Override
-    protected void onSaveInstanceState(Bundle state) {
-        super.onSaveInstanceState(state);
-        state.putInt("level", this.level);
-        state.putParcelable("state", this.gameDesk);
-        state.putLong("startTime", this.levelStartTime);
-        state.putFloat("finishedState", this.finishedLayoutState);
-        state.putBoolean("showingFinished", this.showingFinished);
-        state.putBoolean("hidingFinished", this.hidingFinished);
-        state.putInt("timeTaken", this.millisTaken);
-        state.putBoolean("isBest", this.isBest);
-        state.putBoolean("showNextButton", this.showNextLevelButton);
-        state.putBoolean("paused", this.paused);
-    }
-
-    private static void addMargins(TextView textView, int width) {
-        textView.setWidth(width - width / 8);
-        textView.setLeft(width / 16);
-        textView.setRight(width / 16);
-        textView.setGravity(Gravity.CENTER);
+    protected void onResume()
+    {
+        super.onResume();
+        if (this.state == PlayState.PLAYING)
+        {
+            // resume the timing
+            this.timerLastStart = System.currentTimeMillis();
+        }
     }
 
     @Override
-    protected void onStop() {
+    protected void onStop()
+    {
         super.onStop();
         this.plane.getCloseReady();
         IO.saveData(this.getApplicationContext());
     }
 
     @Override
-    public boolean onTouchEvent(MotionEvent event) {
-        if (this.finishedLayoutState == 0) {
-            this.plane.gestureDetector.onTouchEvent(event);
+    protected void onRestoreInstanceState(Bundle savedInstanceState)
+    {
+        super.onRestoreInstanceState(savedInstanceState);
+        this.level = savedInstanceState.getInt("level");
+        this.state = (PlayState)savedInstanceState.getSerializable("state");
+        this.gameDesk = savedInstanceState.getParcelable("desk");
+        this.millisTaken = savedInstanceState.getInt("millisTaken");
+        if (this.state != PlayState.PLAYING)
+        {
+            this.paused = savedInstanceState.getBoolean("paused");
+            this.finished = savedInstanceState.getBoolean("finished");
+            if (this.state != PlayState.DIALOG)
+            {
+                this.animationState = savedInstanceState.getFloat("animationState");
+                this.updateHandler.postDelayed(this, 17);
+            }
+            if (this.finished)
+            {
+                this.isBest = savedInstanceState.getBoolean("isBest");
+                this.showNextLevelButton = savedInstanceState.getBoolean("showNextLevelButton");
+                this.prepareDialogForFinished();
+            }
+            else
+            {
+                this.prepareDialogForPause();
+            }
         }
-        return super.onTouchEvent(event);
     }
 
-    private void updateFinishedPosition() {
-        float positionFraction = getMovableViewPosition(this.finishedLayoutState, 0.0f);
-        this.finishedLayout.setX((int) (-(1 - positionFraction) * this.finishedLayout.getWidth()));
+    /**
+     * Sets the position of the dialog layout. Used for showing and hiding the dialog view.
+     * @param position the position of the dialog to set (from 0.0 to 1.0)
+     */
+    private void updateDialogPosition(float position)
+    {
+        float positionFraction = getMovableViewPosition(position, 0.0f);
+        this.dialogLayout.setX((int) (-(1 - positionFraction) * this.dialogLayout.getWidth()));
     }
 
-    public static float getMovableViewPosition(float state, float initialSpeed) {
+    /**
+     * @param state the state of the animation from 0.0 to 1.0
+     * @param initialSpeed a value corresponding to the rate of change at the beginning of the animation
+     * @return the current position calculated using a cubic curve with values between 0.0 and 1.0
+     */
+    public static float getMovableViewPosition(float state, float initialSpeed)
+    {
         return (float) ((2 * initialSpeed - 2) * Math.pow(state, 3) + (3 - 3 * initialSpeed) * Math.pow(state, 2) + initialSpeed * state);
     }
 
     @Override
-    public void onBackPressed() {
-        if (this.paused) {
-            this.hideFinished();
-            this.paused = false;
+    public void onBackPressed()
+    {
+        // unpause if paused
+        if (this.state == PlayState.DIALOG && this.paused)
+        {
+            this.state = PlayState.HIDING_DIALOG;
+            this.animationState = 0;
+            this.updateHandler.postDelayed(this, 17);
         }
-        else {
-            if (this.finishedLayoutState == 0) {
-                this.paused = true;
-                this.updatePauseLayout();
-                this.showingFinished = true;
-                this.updateHandler.postDelayed(this, 17);
-            }
+        // close if finished
+        else if (this.state == PlayState.DIALOG && this.finished)
+        {
+            this.finish();
+        }
+        // pause if playing
+        else if (this.state == PlayState.PLAYING)
+        {
+            this.millisTaken += System.currentTimeMillis() - this.timerLastStart;
+            this.timerLastStart = 0;
+            this.state = PlayState.SHOWING_DIALOG;
+            this.paused = true;
+            this.animationState = 0;
+            this.prepareDialogForPause();
+            this.updateHandler.postDelayed(this, 17);
         }
     }
 
-    private void showFinished() {
-        this.showingFinished = true;
-        this.updateHandler.postDelayed(this, 17);
+    /**
+     * Sets the values in the dialog layout to look like a pause screen.
+     */
+    private void prepareDialogForPause()
+    {
+        Button resumeButton = (Button) this.dialogLayout.findViewById(R.id.nextLevelOrResumeButton);
+        resumeButton.setText("RESUME");
+        resumeButton.setVisibility(View.VISIBLE);
+        ((TextView) this.dialogLayout.findViewById(R.id.congratulationsText)).setText("Paused");
+        this.dialogLayout.findViewById(R.id.timeText).setVisibility(View.INVISIBLE);
+        this.dialogLayout.findViewById(R.id.bestText).setVisibility(View.INVISIBLE);
+    }
+
+    /**
+     * Starts showing a dialog of a finished level.
+     * Should be called when the user makes the last move and the GameDesk goes cleared.
+     */
+    private void finishLevel()
+    {
+        this.state = PlayState.SHOWING_DIALOG;
+        this.finished = true;
+
+        // add the time from the last period
+        this.millisTaken += (int) (System.currentTimeMillis() - this.timerLastStart);
+        this.timerLastStart = 0;
+
+        // decide whether a next level is available
         this.showNextLevelButton = !(this.level == Level.levels.length - 1);
-        this.millisTaken = (int) (System.currentTimeMillis() - this.levelStartTime);
-        if (this.level == Level.maxLevel) {
+
+        // push the maxlevel if appropriate
+        if (this.level == Level.maxLevel && this.level != Level.levels.length - 1)
+        {
             Level.maxLevel++;
         }
+
+        // change the best time
         int currentBestTime = Level.bestTimes[this.level];
-        if (currentBestTime == 0 || this.millisTaken < currentBestTime) {
+        if (currentBestTime == 0 || this.millisTaken < currentBestTime)
+        {
             Level.bestTimes[this.level] = this.millisTaken;
             this.isBest = true;
         }
-        else {
+        else
+        {
             this.isBest = false;
         }
-        this.updateFinishedData();
-    }
 
-    private void updateFinishedData() {
-        ((TextView) this.finishedLayout.findViewById(R.id.congratulationsText)).setText("Congratulations!");
-        TextView timeTakenText = (TextView) this.finishedLayout.findViewById(R.id.timeText);
-        timeTakenText.setText("You've finished this level in " + formatTime(this.millisTaken) + " seconds.");
-        timeTakenText.setVisibility(View.VISIBLE);
-        TextView bestTimeText = (TextView) this.finishedLayout.findViewById(R.id.bestText);
-        bestTimeText.setVisibility(View.VISIBLE);
-        if (this.isBest) {
-            bestTimeText.setText("That's a new best time!");
-        }
-        else {
-            bestTimeText.setText("The best time is " + formatTime(Level.bestTimes[this.level]) + " seconds.");
-        }
-        Button nextLevelButton = (Button) this.finishedLayout.findViewById(R.id.nextLevelButton);
-        nextLevelButton.setText("NEXT LEVEL");
-        if (!this.showNextLevelButton) {
-            this.finishedLayout.findViewById(R.id.nextLevelButton).setVisibility(View.INVISIBLE);
-        }
-    }
-
-    private void updatePauseLayout() {
-        Button resumeButton = (Button) this.finishedLayout.findViewById(R.id.nextLevelButton);
-        resumeButton.setText("RESUME");
-        resumeButton.setVisibility(View.VISIBLE);
-        ((TextView) this.finishedLayout.findViewById(R.id.congratulationsText)).setText("Paused");
-        this.finishedLayout.findViewById(R.id.timeText).setVisibility(View.INVISIBLE);
-        this.finishedLayout.findViewById(R.id.bestText).setVisibility(View.INVISIBLE);
-    }
-
-    public static String formatTime(int time) {
-        return String.valueOf(time / 1000) + "." + String.format("%03d", time % 1000);
-    }
-
-    private void hideFinished() {
-        this.hidingFinished = true;
+        this.prepareDialogForFinished();
         this.updateHandler.postDelayed(this, 17);
     }
 
-    public void goToNextLevel(View v) {
-        if (v.getId() == R.id.nextLevelButton) {
-            if (this.paused) {
+    /**
+     * Sets the values in the dialog layout to look like a pause level finished screen.
+     */
+    private void prepareDialogForFinished()
+    {
+        ((TextView) this.dialogLayout.findViewById(R.id.congratulationsText)).setText("Congratulations!");
+        TextView timeTakenText = (TextView) this.dialogLayout.findViewById(R.id.timeText);
+        timeTakenText.setText("You've finished this level in " + formatTime(this.millisTaken) + " seconds.");
+        timeTakenText.setVisibility(View.VISIBLE);
+        TextView bestTimeText = (TextView) this.dialogLayout.findViewById(R.id.bestText);
+        bestTimeText.setVisibility(View.VISIBLE);
+        if (this.isBest)
+        {
+            bestTimeText.setText("That's a new best time!");
+        }
+        else
+        {
+            bestTimeText.setText("The best time is " + formatTime(Level.bestTimes[this.level]) + " seconds.");
+        }
+        Button nextLevelButton = (Button) this.dialogLayout.findViewById(R.id.nextLevelOrResumeButton);
+        nextLevelButton.setText("NEXT LEVEL");
+        if (!this.showNextLevelButton)
+        {
+            this.dialogLayout.findViewById(R.id.nextLevelOrResumeButton).setVisibility(View.INVISIBLE);
+        }
+    }
+
+    /**
+     * @param time the number of milliseconds
+     * @return time string in format #.### s
+     */
+    public static String formatTime(int time)
+    {
+        return String.valueOf(time / 1000) + "." + String.format("%03d", time % 1000);
+    }
+
+    /**
+     * Handles the press of the next level button or the resume button (depending on whether the dialog is pause or finished).
+     * @param v the view that caused the call
+     */
+    public void nextLevelOrResumePress(View v)
+    {
+        if (v.getId() == R.id.nextLevelOrResumeButton && this.state == PlayState.DIALOG)
+        {
+            if (this.paused)
+            {
+                // hide the pause dialog
+                this.state = PlayState.HIDING_DIALOG;
                 this.paused = false;
-                this.hideFinished();
+                this.animationState = 0;
+                this.updateHandler.postDelayed(this, 17);
             }
-            else {
+            else if (this.finished)
+            {
+                // advance the level and hide the finished dialog
                 this.level++;
-                this.gameDesk = Level.levels[this.level].getFreeDesk();
+                this.gameDesk = Level.levels[this.level].getNewDesk();
                 ClickField.availableClickFields = Level.levels[this.level].allowedClickFields;
                 ClickField.selectedClickField = 0;
-                this.plane.postInvalidate();
-                this.hideFinished();
-                this.levelStartTime = System.currentTimeMillis();
+                this.state = PlayState.HIDING_DIALOG;
+                this.animationState = 0;
+                this.updateHandler.postDelayed(this, 17);
+                this.plane.updateGameDeskComponentSizes();
+                this.millisTaken = 0;
             }
         }
     }
 
-    public void exitTheGame(View v) {
-        if (v.getId() == R.id.exitButton) {
-            this.startActivity(new Intent(this, StartActivity.class));
+    /**
+     * Handles the press of the exit button.
+     * @param v the view that caused the call
+     */
+    public void exitTheGame(View v)
+    {
+        if (v.getId() == R.id.exitButton && this.state == PlayState.DIALOG)
+        {
+            this.finish();
         }
     }
 
-    public void replay(View v) {
-        if (v.getId() == R.id.replayButton) {
-            this.paused = false;
-            this.gameDesk = Level.levels[this.level].getFreeDesk();
-            this.plane.postInvalidate();
-            this.hideFinished();
-            this.levelStartTime = System.currentTimeMillis();
+    /**
+     * Handles the press of the replay button.
+     * @param v the view that caused the call
+     */
+    public void replay(View v)
+    {
+        if (v.getId() == R.id.replayButton && this.state == PlayState.DIALOG)
+        {
+            this.gameDesk = Level.levels[this.level].getNewDesk();
+            this.state = PlayState.HIDING_DIALOG;
+            this.animationState = 0;
+            this.millisTaken = 0;
+            this.updateHandler.postDelayed(this, 17);
         }
     }
 
+    /**
+     * Updates the Activity.
+     */
     @Override
-    public void run() {
-        if (this.showingFinished) {
-            this.finishedLayoutState += 0.05;
-            if (this.finishedLayoutState >= 1) {
-                this.finishedLayoutState = 1;
-                this.showingFinished = false;
+    public void run()
+    {
+        if (this.state == PlayState.HIDING_DIALOG || this.state == PlayState.SHOWING_DIALOG)
+        {
+            // update the animation state
+            this.animationState += 0.05;
+            if (this.animationState > 1)
+            {
+                this.animationState = 1;
             }
-            else {
+
+            // calculate the dialog position from the animation state depending of whether we are showing or hiding
+            float dialogPosition = this.state == PlayState.SHOWING_DIALOG ? this.animationState : 1 - this.animationState;
+
+            // update the dialog position using to the calculated one
+            this.updateDialogPosition(dialogPosition);
+
+            // do appropriate actions when the animation has finished
+            if (this.animationState == 1)
+            {
+                this.animationState = 0;
+
+                if (this.state == PlayState.HIDING_DIALOG)
+                {
+                    this.timerLastStart = System.currentTimeMillis();
+                    this.paused = false;
+                    this.finished = false;
+                    this.state = PlayState.PLAYING;
+                }
+                else
+                {
+                    this.state = PlayState.DIALOG;
+                }
+            }
+            else
+            {
                 this.updateHandler.postDelayed(this, 17);
             }
-            this.updateFinishedPosition();
-        }
-        else if (this.hidingFinished) {
-            this.finishedLayoutState -= 0.05;
-            if (this.finishedLayoutState <= 0) {
-                this.finishedLayoutState = 0;
-                this.hidingFinished = false;
-            }
-            else {
-                this.updateHandler.postDelayed(this, 17);
-            }
-            this.updateFinishedPosition();
         }
     }
 
-    private class GameView extends View implements Runnable {
+    private class GameView extends View implements Runnable
+    {
 
         private PlayActivity attachedActivity;
-        private Point drawingOrigin;
-        private float fieldSize;
-        private float clickFieldListPosition = 0.5f;
-        private float clickFieldListVelocity;
         private GestureDetectorCompat gestureDetector;
         private boolean keepUpdating = true;
         private Handler updateHandler = new Handler();
+        private final int backgroundColor = Color.rgb(220, 220, 220);
+        private final int selectionDialogSelectedColor = Color.rgb(100, 0, 180);
+        private final int selectionDialogNotSelectedColor = Color.rgb(200, 0, 255);
 
-        public GameView(PlayActivity playActivity) {
+        private boolean animatingFieldChoice = false;
+        private float choiceState = 0;
+        private boolean choiceFromPrev;
+
+        private Paint p = new Paint();
+
+        // width and height of the whole view
+        private int width;
+        private int height;
+
+        // the top left corner of the tile grid
+        private int gridCornerX;
+        private int gridCornerY;
+
+        // size of the area where the grid is drawn
+        private int gridSpaceWidth;
+        private int gridSpaceHeight;
+
+        private float tileSize;
+
+        // the number of columns of the GameDesk
+        private int tilesInWidth;
+
+        // the number of rows of the GameDesk
+        private int tilesInHeight;
+
+        private Rect levelInfoBounds;
+        private Rect timeInfoBounds;
+
+        // coordinates of the ClickField selection dialog squares
+        private int prevSelectionStartX;
+        private int prevSelectionStartY;
+        private int curSelectionStartX;
+        private int curSelectionStartY;
+        private int nextSelectionStartX;
+        private int nextSelectionStartY;
+
+        private int selectionSquareSize;
+
+        // a path object used for the tile grid change animations
+        private Path gridAnimationPath;
+
+        /**
+         * Indicates whether the initializeComponentSizes method has been already called and therefore the component sizes are initialized.
+         * The initializeComponentSizes method actually can't be called right in the beginning (in the constructor or so)
+         * because the size of the View and similar UI related quantities are not yet known at that time.
+         */
+        private boolean initialized = false;
+
+        private StringDraw.StringDrawData timeInfoDraw = null;
+        private int calibrationLimit = 0;
+
+        private StringDraw.StringDrawData levelInfoDraw;
+
+        /**
+         * Precomputes the sizes and locations of various components, so that it does not need to be recalculated in every redraw or tap.
+         */
+        private void initializeComponentSizes()
+        {
+            this.width = this.getWidth();
+            this.height = this.getHeight();
+
+            // the top of the area where grid and the field selection dialog are drawn
+            // the level and time information is drawn above that
+            int playYStart = this.height / 5;
+
+            // set the sizes of the level and time info bounds
+            this.levelInfoBounds = new Rect(0, 0, this.width, playYStart * 2 / 3);
+            StringDraw.applyBordersChange(this.levelInfoBounds, playYStart / 10);
+
+            this.timeInfoBounds = new Rect(0, playYStart * 2 / 3, this.width, playYStart);
+            StringDraw.applyBordersChange(this.timeInfoBounds, playYStart / 10);
+
+            // calculates the locations of the selection dialog and the size of the grid space
+            if (this.width < this.height - playYStart)
+            {
+                // the selection dialog will be in the left-right direction
+
+                int selectionSpaceWidth = this.width;
+                int selectionSpaceHeight = (this.height - playYStart) / 5;
+                if (selectionSpaceWidth / (float)selectionSpaceHeight > 3)
+                {
+                    this.selectionSquareSize = selectionSpaceHeight;
+                    this.curSelectionStartX = width / 2 - this.selectionSquareSize / 2;
+                    this.prevSelectionStartX = this.curSelectionStartX - this.selectionSquareSize;
+                    this.nextSelectionStartX = this.curSelectionStartX + this.selectionSquareSize;
+                    this.prevSelectionStartY = this.curSelectionStartY = this.nextSelectionStartY = this.height - selectionSpaceHeight;
+                }
+                else
+                {
+                    this.selectionSquareSize = selectionSpaceWidth / 3;
+                    this.prevSelectionStartX = 0;
+                    this.curSelectionStartX = this.selectionSquareSize;
+                    this.nextSelectionStartX = 2 * this.selectionSquareSize;
+                    this.prevSelectionStartY = this.curSelectionStartY = this.nextSelectionStartY = this.height - selectionSpaceHeight / 2 - this.selectionSquareSize / 2;
+                }
+                this.gridSpaceWidth = this.width;
+                this.gridSpaceHeight = this.height - playYStart - selectionSpaceHeight;
+            }
+            else
+            {
+                // the selection dialog will be in the top-bottom direction
+
+                int selectionSpaceWidth = this.width / 5;
+                int selectionSpaceHeight = this.height - playYStart;
+                if (selectionSpaceHeight / (float)selectionSpaceWidth > 3)
+                {
+                    this.selectionSquareSize = selectionSpaceWidth;
+                    this.prevSelectionStartX = this.curSelectionStartX = this.nextSelectionStartX = this.width - selectionSpaceWidth;
+                    this.curSelectionStartY = playYStart + selectionSpaceHeight / 2 - this.selectionSquareSize / 2;
+                    this.prevSelectionStartY = this.curSelectionStartY - this.selectionSquareSize;
+                    this.nextSelectionStartY = this.curSelectionStartY + this.selectionSquareSize;
+                }
+                else
+                {
+                    this.selectionSquareSize = selectionSpaceHeight / 3;
+                    this.prevSelectionStartX = this.curSelectionStartX = this.nextSelectionStartX = this.width - selectionSpaceWidth / 2 - this.selectionSquareSize / 2;
+                    this.prevSelectionStartY = playYStart;
+                    this.curSelectionStartY = playYStart + this.selectionSquareSize;
+                    this.nextSelectionStartY = playYStart + 2 * this.selectionSquareSize;
+                }
+
+                this.gridSpaceWidth = this.width - selectionSpaceWidth;
+                this.gridSpaceHeight = selectionSpaceHeight;
+            }
+
+            // calculates the size of one tile on the GameDesk and the location of the GameDesk
+            this.tilesInWidth = this.attachedActivity.gameDesk.width;
+            this.tilesInHeight = this.attachedActivity.gameDesk.height;
+            float gridWidthToHeight = this.tilesInWidth / (float)this.tilesInHeight;
+            if (gridWidthToHeight > this.gridSpaceWidth / (float)this.gridSpaceHeight)
+            {
+                this.tileSize = this.gridSpaceWidth / (float)this.tilesInWidth;
+                this.gridCornerX = 0;
+                this.gridCornerY = playYStart + this.gridSpaceHeight / 2 - (int)(this.tileSize * this.tilesInHeight / 2);
+            }
+            else
+            {
+                this.tileSize = this.gridSpaceHeight / (float)this.tilesInHeight;
+                this.gridCornerX = this.gridSpaceWidth / 2 - (int)(this.tileSize * this.tilesInWidth / 2);
+                this.gridCornerY = playYStart;
+            }
+
+            this.p.setTypeface(Typeface.DEFAULT);
+            this.levelInfoDraw = StringDraw.getMaxStringData("Level " + (this.attachedActivity.level + 1), this.levelInfoBounds, StringDraw.TextAlign.MIDDLE, this.p);
+
+            this.gridAnimationPath = new Path();
+            this.gridAnimationPath.setFillType(Path.FillType.EVEN_ODD);
+
+            this.initialized = true;
+        }
+
+        /**
+         * Updates the sizes of components related to the size of the GameDesk. Should be called when the next level is started.
+         */
+        public void updateGameDeskComponentSizes()
+        {
+            // the top of the area where grid and the field selection dialog are drawn
+            // the level and time information is drawn above that
+            int playYStart = this.height / 5;
+
+            // calculates the size of one tile on the GameDesk and the location of the GameDesk
+            this.tilesInWidth = this.attachedActivity.gameDesk.width;
+            this.tilesInHeight = this.attachedActivity.gameDesk.height;
+            float gridWidthToHeight = this.tilesInWidth / (float)this.tilesInHeight;
+            if (gridWidthToHeight > gridSpaceWidth / (float)gridSpaceHeight)
+            {
+                this.tileSize = gridSpaceWidth / (float)this.tilesInWidth;
+                this.gridCornerX = 0;
+                this.gridCornerY = playYStart + gridSpaceHeight / 2 - (int)(this.tileSize * this.tilesInHeight / 2);
+            }
+            else
+            {
+                this.tileSize = gridSpaceHeight / (float)this.tilesInHeight;
+                this.gridCornerX = gridSpaceWidth / 2 - (int)(this.tileSize * this.tilesInWidth / 2);
+                this.gridCornerY = playYStart;
+            }
+
+            this.p.setTypeface(Typeface.DEFAULT);
+            this.levelInfoDraw = StringDraw.getMaxStringData("Level " + (this.attachedActivity.level + 1), this.levelInfoBounds, StringDraw.TextAlign.MIDDLE, this.p);
+        }
+
+        public GameView(PlayActivity playActivity)
+        {
             super(playActivity.getApplicationContext());
             this.attachedActivity = playActivity;
-            this.setBackgroundColor(Color.WHITE);
+            this.setBackgroundColor(backgroundColor);
             this.gestureDetector = new GestureDetectorCompat(this.attachedActivity.getApplicationContext(), new GestureListener(this));
             this.updateHandler.postDelayed(this, 17);
         }
 
-        public void run() {
+        /**
+         * Implementation of the Runnable interface - calls the update method.
+         */
+        public void run()
+        {
             this.update();
-            if (keepUpdating) {
+            if (keepUpdating)
+            {
                 this.updateHandler.postDelayed(this, 17);
             }
         }
 
-        public void getCloseReady() {
+        /**
+         * Unbinds any resources, gets ready for destroying - stops updating.
+         */
+        public void getCloseReady()
+        {
             this.keepUpdating = false;
         }
 
-        private void update() {
-            if (this.clickFieldListVelocity != 0) {
-                this.clickFieldListPosition += this.clickFieldListVelocity;
-                if (this.clickFieldListPosition < 0) {
-                    this.clickFieldListPosition = 0;
-                    this.clickFieldListVelocity = 0;
+        /**
+         * Updates the animations and invalidates the view.
+         */
+        private void update()
+        {
+            if (this.animatingFieldChoice)
+            {
+                this.choiceState += 0.1;
+                if (this.choiceState >= 1)
+                {
+                    this.animatingFieldChoice = false;
                 }
-                else if (this.clickFieldListPosition > ClickField.availableClickFields.length) {
-                    this.clickFieldListPosition = ClickField.availableClickFields.length;
-                    this.clickFieldListVelocity = 0;
+            }
+            this.invalidate();
+        }
+
+        @Override
+        protected void onDraw(Canvas canvas)
+        {
+            if (!initialized)
+                this.initializeComponentSizes();
+
+            // draw the level and time info
+            this.p.setColor(Color.BLACK);
+            this.p.setTypeface(Typeface.DEFAULT);
+            StringDraw.drawMaxString("Level " + (this.attachedActivity.level + 1), this.levelInfoDraw, canvas, this.p);
+            int millisecondsTaken = this.attachedActivity.millisTaken;
+            if (this.attachedActivity.state == PlayState.PLAYING)
+            {
+                millisecondsTaken += System.currentTimeMillis() - this.attachedActivity.timerLastStart;
+            }
+            this.p.setTypeface(Typeface.MONOSPACE);
+            if (this.timeInfoDraw == null || this.calibrationLimit <= millisecondsTaken / 1000)
+            {
+                int digCount = millisecondsTaken < 1000 ? 1 : (int)Math.floor(Math.log10(millisecondsTaken / 1000)) + 1;
+                this.timeInfoDraw = StringDraw.getMaxStringData(millisecondsTaken / 1000 + " s", this.timeInfoBounds, StringDraw.TextAlign.MIDDLE, this.p);
+                this.calibrationLimit = 1;
+                for (int i = 0; i < digCount; i++)
+                {
+                    this.calibrationLimit *= 10;
                 }
-                this.clickFieldListVelocity *= 0.97;
-                if (this.clickFieldListVelocity < 0.01 && this.clickFieldListVelocity > -0.01) {
-                    this.clickFieldListVelocity = 0;
+            }
+            StringDraw.drawMaxString(millisecondsTaken / 1000 + " s", this.timeInfoDraw, canvas, this.p);
+
+            float animationFraction = 0;
+
+            // update the animation of the grid
+            if (this.attachedActivity.gameDesk.isAnimating)
+            {
+                float animState = (System.currentTimeMillis() - this.attachedActivity.gameDesk.animationBegin) / (float)GameDesk.animationLength;
+                if (animState > 1)
+                {
+                    this.attachedActivity.gameDesk.isAnimating = false;
                 }
-                this.invalidate();
+                animationFraction = getMovableViewPosition(animState, 0);
+            }
+
+            boolean isAnimating = this.attachedActivity.gameDesk.isAnimating;
+
+            // drawing the grid
+            for (int i = 0; i < this.tilesInWidth; i++)
+            {
+                for (int j = 0; j < this.tilesInHeight; j++)
+                {
+                    boolean animated = isAnimating && this.attachedActivity.gameDesk.animating[i + j * this.attachedActivity.gameDesk.width];
+                    p.setColor(this.attachedActivity.gameDesk.state(i, j) ^ animated ? badColor : goodColor);
+                    int rectStartX = (int) (this.gridCornerX + i * this.tileSize);
+                    int rectStartY = (int) (this.gridCornerY + j * this.tileSize);
+                    canvas.drawRect(rectStartX, rectStartY, rectStartX + this.tileSize, rectStartY + this.tileSize, this.p);
+                    if (animated)
+                    {
+                        // the portion of the bottom triangle of the cover
+                        float bottomFraction = 2 * Math.min(animationFraction, 0.5f);
+
+                        float p1x = rectStartX + this.tileSize * (1 - bottomFraction);
+                        float p1y = rectStartY + this.tileSize;
+                        float p2x = rectStartX + this.tileSize;
+                        float p2y = rectStartY + this.tileSize;
+                        float p3x = rectStartX + this.tileSize;
+                        float p3y = rectStartY + this.tileSize * (1 - bottomFraction);
+                        if (animationFraction > 0.3)
+                        {
+                            p.setTextSize(30);
+                        }
+                        p.setColor(this.attachedActivity.gameDesk.state(i, j) ? badColor : goodColor);
+                        this.gridAnimationPath.reset();
+                        this.gridAnimationPath.moveTo(p1x, p1y);
+                        this.gridAnimationPath.lineTo(p2x, p2y);
+                        this.gridAnimationPath.lineTo(p3x, p3y);
+
+                        // if the animation is more than half the way through, the top triangle should be drawn also
+                        if (animationFraction > 0.5)
+                        {
+                            // the portion of the top triangle of the cover
+                            float topFraction = 2 * (animationFraction - 0.5f);
+
+                            this.gridAnimationPath.lineTo(rectStartX + this.tileSize * (1 - topFraction), rectStartY);
+                            this.gridAnimationPath.lineTo(rectStartX, rectStartY + this.tileSize * (1 - topFraction));
+                        }
+                        this.gridAnimationPath.close();
+                        this.p.setColor(this.attachedActivity.gameDesk.state(i, j) ? badColor : goodColor);
+                        canvas.drawPath(this.gridAnimationPath, this.p);
+                    }
+                }
+            }
+
+            // drawing the empty lines in the grid
+            p.setColor(this.backgroundColor);
+            p.setStrokeWidth(this.tileSize / 32);
+            for (int i = 0; i < this.tilesInWidth + 1; i++)
+            {
+                canvas.drawLine(this.gridCornerX + i * this.tileSize, this.gridCornerY, this.gridCornerX + i * this.tileSize, this.gridCornerY + this.tilesInHeight * this.tileSize, p);
+            }
+            for (int i = 0; i < this.tilesInHeight + 1; i++)
+            {
+                canvas.drawLine(this.gridCornerX, this.gridCornerY + i * this.tileSize, this.gridCornerX + this.tilesInWidth * this.tileSize, this.gridCornerY + i * this.tileSize, p);
+            }
+
+            // drawing the field list
+            this.p.setColor(this.selectionDialogSelectedColor);
+            canvas.drawRect(this.curSelectionStartX, this.curSelectionStartY, this.curSelectionStartX + this.selectionSquareSize, this.curSelectionStartY + this.curSelectionStartY, this.p);
+            this.p.setColor(this.selectionDialogNotSelectedColor);
+            canvas.drawRect(this.prevSelectionStartX, this.prevSelectionStartY, this.prevSelectionStartX + this.selectionSquareSize, this.prevSelectionStartY + this.selectionSquareSize, this.p);
+            canvas.drawRect(this.nextSelectionStartX, this.nextSelectionStartY, this.nextSelectionStartX + this.selectionSquareSize, this.nextSelectionStartY + this.selectionSquareSize, this.p);
+            int border = this.selectionSquareSize / 10;
+            if (this.animatingFieldChoice)
+            {
+                // draw the ClickFields animated
+                if (this.choiceFromPrev)
+                {
+                    if (ClickField.selectedClickField != 0)
+                    {
+                        int size = this.selectionSquareSize - 4 * border;
+                        size *= this.choiceState * this.choiceState;
+                        int centerX = this.prevSelectionStartX + this.selectionSquareSize / 2;
+                        int centerY = this.prevSelectionStartY + this.selectionSquareSize / 2;
+                        drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 1], centerX - size / 2, centerY - size / 2, centerX + size / 2, centerY + size / 2, canvas, this.p);
+                    }
+                    int movInCenterX = this.prevSelectionStartX + this.selectionSquareSize / 2 + (int)((this.curSelectionStartX - this.prevSelectionStartX) * this.choiceState * this.choiceState);
+                    int movInCenterY = this.prevSelectionStartY + this.selectionSquareSize / 2 + (int)((this.curSelectionStartY - this.prevSelectionStartY) * this.choiceState * this.choiceState);
+                    int movInSize = this.selectionSquareSize - 4 * border + (int)(2 * border * this.choiceState * this.choiceState);
+                    drawClickField(ClickField.availableClickFields[ClickField.selectedClickField], movInCenterX - movInSize / 2, movInCenterY - movInSize / 2, movInCenterX + movInSize / 2, movInCenterY + movInSize / 2, canvas, this.p);
+                    if (ClickField.selectedClickField != ClickField.availableClickFields.length - 1)
+                    {
+                        int movOutCenterX = movInCenterX + this.curSelectionStartX - this.prevSelectionStartX;
+                        int movOutCenterY = movInCenterY + this.curSelectionStartY - this.prevSelectionStartY;
+                        int movOutSize = this.selectionSquareSize - 2 * border - (int)(2 * border * this.choiceState * this.choiceState);
+                        drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 1], movOutCenterX - movOutSize / 2, movOutCenterY - movOutSize / 2, movOutCenterX + movOutSize / 2, movOutCenterY + movOutSize / 2, canvas, this.p);
+                        if (ClickField.selectedClickField != ClickField.availableClickFields.length - 2)
+                        {
+                            int popOutSize = (int)((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
+                            int popOutRad = popOutSize / 2;
+                            int popOutCenterX = this.nextSelectionStartX + this.selectionSquareSize / 2;
+                            int popOutCenterY = this.nextSelectionStartY + this.selectionSquareSize / 2;
+                            drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 2], popOutCenterX - popOutRad, popOutCenterY - popOutRad, popOutCenterX + popOutRad, popOutCenterY + popOutRad, canvas, this.p);
+                        }
+                    }
+                }
+                else
+                {
+                    if (ClickField.selectedClickField != ClickField.availableClickFields.length - 1)
+                    {
+                        int size = this.selectionSquareSize - 4 * border;
+                        size *= this.choiceState * this.choiceState;
+                        int centerX = this.nextSelectionStartX + this.selectionSquareSize / 2;
+                        int centerY = this.nextSelectionStartY + this.selectionSquareSize / 2;
+                        drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 1], centerX - size / 2, centerY - size / 2, centerX + size / 2, centerY + size / 2, canvas, this.p);
+                    }
+                    int movInCenterX = this.nextSelectionStartX + this.selectionSquareSize / 2 - (int)((this.nextSelectionStartX - this.curSelectionStartX) * this.choiceState * this.choiceState);
+                    int movInCenterY = this.nextSelectionStartY + this.selectionSquareSize / 2 - (int)((this.nextSelectionStartY - this.curSelectionStartY) * this.choiceState * this.choiceState);
+                    int movInSize = this.selectionSquareSize - 4 * border + (int)(2 * border * this.choiceState * this.choiceState);
+                    drawClickField(ClickField.availableClickFields[ClickField.selectedClickField], movInCenterX - movInSize / 2, movInCenterY - movInSize / 2, movInCenterX + movInSize / 2, movInCenterY + movInSize / 2, canvas, this.p);
+                    if (ClickField.selectedClickField != 0)
+                    {
+                        int movOutCenterX = movInCenterX - (this.curSelectionStartX - this.prevSelectionStartX);
+                        int movOutCenterY = movInCenterY - (this.curSelectionStartY - this.prevSelectionStartY);
+                        int movOutSize = this.selectionSquareSize - 2 * border - (int)(2 * border * this.choiceState * this.choiceState);
+                        drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 1], movOutCenterX - movOutSize / 2, movOutCenterY - movOutSize / 2, movOutCenterX + movOutSize / 2, movOutCenterY + movOutSize / 2, canvas, this.p);
+                        if (ClickField.selectedClickField != 1)
+                        {
+                            int popOutSize = (int)((this.selectionSquareSize - 4 * border) * (1 - this.choiceState * this.choiceState));
+                            int popOutRad = popOutSize / 2;
+                            int popOutCenterX = this.prevSelectionStartX + this.selectionSquareSize / 2;
+                            int popOutCenterY = this.prevSelectionStartY + this.selectionSquareSize / 2;
+                            drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 2], popOutCenterX - popOutRad, popOutCenterY - popOutRad, popOutCenterX + popOutRad, popOutCenterY + popOutRad, canvas, this.p);
+                        }
+                    }
+                }
+            }
+            else
+            {
+                // draw the ClickField static (not animated)
+                drawClickField(ClickField.availableClickFields[ClickField.selectedClickField], this.curSelectionStartX + border, this.curSelectionStartY + border,
+                        this.curSelectionStartX + this.selectionSquareSize - border, this.curSelectionStartY + this.selectionSquareSize - border, canvas, this.p);
+                if (ClickField.selectedClickField != 0)
+                {
+                    drawClickField(ClickField.availableClickFields[ClickField.selectedClickField - 1], this.prevSelectionStartX + 2 * border, this.prevSelectionStartY + 2 * border,
+                            this.prevSelectionStartX + this.selectionSquareSize - 2 * border, this.prevSelectionStartY + this.selectionSquareSize - 2 * border, canvas, this.p);
+                }
+                if (ClickField.selectedClickField != ClickField.availableClickFields.length - 1)
+                {
+                    drawClickField(ClickField.availableClickFields[ClickField.selectedClickField + 1], this.nextSelectionStartX + 2 * border, this.nextSelectionStartY + 2 * border,
+                            this.nextSelectionStartX + this.selectionSquareSize - 2 * border, this.nextSelectionStartY + this.selectionSquareSize - 2 * border, canvas, this.p);
+                }
             }
         }
 
         @Override
-        protected void onDraw(Canvas canvas) {
-            //Drawing the grid
-            int playWidth = this.getWidth();
-            int playHeight = this.getHeight() * 4 / 5;
-            Paint p = new Paint();
-            int rowSize = this.attachedActivity.gameDesk.rowSize();
-            int columnSize = this.attachedActivity.gameDesk.columnSize();
-            float rowColumnRatio = rowSize / (float) columnSize;
-            if (rowColumnRatio < playWidth / (float) playHeight) {
-                this.fieldSize = playHeight / (float) columnSize;
-                this.drawingOrigin = new Point((int) ((playWidth - rowSize * this.fieldSize) / 2), 0);
-            }
-            else {
-                this.fieldSize = playWidth / (float) rowSize;
-                this.drawingOrigin = new Point(0, (int) ((playHeight - columnSize * this.fieldSize) / 2));
-            }
-            for (int i = 0; i < columnSize; i++) {
-                for (int j = 0; j < rowSize; j++) {
-                    p.setColor(this.attachedActivity.gameDesk.states[i][j] ? badColor : goodColor);
-                    int rectStartX = (int) (this.drawingOrigin.x + j * this.fieldSize);
-                    int rectStartY = (int) (this.drawingOrigin.y + i * this.fieldSize);
-                    Rect rect = new Rect(rectStartX, rectStartY, rectStartX + (int) this.fieldSize, rectStartY + (int) this.fieldSize);
-                    canvas.drawRect(rect, p);
-                }
-            }
-            p.setColor(Color.WHITE);
-            p.setStrokeWidth(this.fieldSize / 32);
-            for (int i = 0; i < rowSize + 1; i++) {
-                canvas.drawLine(this.drawingOrigin.x + i * this.fieldSize, this.drawingOrigin.y, this.drawingOrigin.x + i * this.fieldSize, this.drawingOrigin.y + columnSize * this.fieldSize, p);
-            }
-            for (int i = 0; i < columnSize + 1; i++) {
-                canvas.drawLine(this.drawingOrigin.x, this.drawingOrigin.y + i * this.fieldSize, this.drawingOrigin.x + rowSize * this.fieldSize, this.drawingOrigin.y + i * this.fieldSize, p);
-            }
+        public boolean onTouchEvent(MotionEvent event)
+        {
+            super.onTouchEvent(event);
 
-            //Drawing the field list
-            float listDistanceToEnd = this.getWidth() / (float) (this.getHeight() / 5);
-            float visionFieldStart = this.clickFieldListPosition - listDistanceToEnd;
-            float visionFieldEnd = this.clickFieldListPosition + listDistanceToEnd;
-            int firstIndexToDraw = (int) visionFieldStart;
-            int lastIndexToDraw = (int) visionFieldEnd;
-            if (firstIndexToDraw < 0) {
-                firstIndexToDraw = 0;
-            }
-            if (lastIndexToDraw >= ClickField.availableClickFields.length) {
-                lastIndexToDraw = ClickField.availableClickFields.length - 1;
-            }
-            int borderSize = this.getHeight() / 40;
-            for (int i = firstIndexToDraw; i <= lastIndexToDraw; i++) {
-                int left = (int) ((i - this.clickFieldListPosition) * this.getHeight() / 5 + this.getWidth() / 2);
-
-                drawClickField(ClickField.availableClickFields[i], new Rect(left + borderSize, this.getHeight() * 4 / 5 + borderSize, left + this.getHeight() / 5 - borderSize, this.getHeight() - borderSize), canvas);
-                if (i == ClickField.selectedClickField) {
-                    p.setColor(Color.YELLOW);
-                    Point p1 = new Point(left + this.getHeight() / 5 - this.getHeight() / 20, this.getHeight());
-                    Point p2 = new Point(left + this.getHeight() / 5, this.getHeight());
-                    Point p3 = new Point(left + this.getHeight() / 5, this.getHeight() - this.getHeight() / 20);
-                    Path path = new Path();
-                    path.moveTo(p1.x, p1.y);
-                    path.lineTo(p2.x, p2.y);
-                    path.lineTo(p3.x, p3.y);
-                    canvas.drawPath(path, p);
-                    p.setColor(Color.RED);
-                }
-            }
-        }
-    }
-
-    private static void drawClickField(ClickField clickField, Rect bounds, Canvas canvas) {
-        Paint p = new Paint();
-        p.setColor(Color.RED);
-        Point origin;
-        float fieldSize;
-        if (bounds.width() / (float) bounds.height() > clickField.getTotalWidth() / (float) clickField.getTotalHeight()) {
-            fieldSize = bounds.height() / (float) clickField.getTotalHeight();
-            origin = new Point((int) ((bounds.width() - clickField.getTotalWidth() * fieldSize) / 2) + bounds.left, bounds.top);
-        }
-        else {
-            fieldSize = bounds.width() / (float) clickField.getTotalWidth();
-            origin = new Point(bounds.left, (int) ((bounds.height() - clickField.getTotalHeight() * fieldSize) / 2) + bounds.top);
-        }
-        for (int i = 0; i < clickField.getTotalWidth(); i++) {
-            for (int j = 0; j < clickField.getTotalHeight(); j++) {
-                boolean isClickPosition = clickField.getClickX() == i && clickField.getClickY() == j;
-                boolean isChangedOnClick = clickField.getInAbsoluteCoordinates(i, j);
-                if (isChangedOnClick || isClickPosition) {
-                    int rectStartX = (int) (origin.x + fieldSize * i);
-                    int rectStartY = (int) (origin.y + fieldSize * j);
-                    if (isChangedOnClick) {
-                        Rect rect = new Rect(rectStartX, rectStartY, rectStartX + (int) fieldSize, rectStartY + (int) fieldSize);
-                        canvas.drawRect(rect, p);
-                    }
-                    if (isClickPosition) {
-                        rectStartX += fieldSize / 4;
-                        rectStartY += fieldSize / 4;
-                        Rect rect = new Rect(rectStartX, rectStartY, rectStartX + (int) (fieldSize / 2), rectStartY + (int) (fieldSize / 2));
-                        p.setColor(Color.GREEN);
-                        canvas.drawRect(rect, p);
-                        p.setColor(Color.RED);
-                    }
-                }
-            }
-        }
-        p.setStrokeWidth(fieldSize / 32);
-        p.setColor(Color.WHITE);
-        for (int i = 1; i < clickField.getTotalWidth(); i++) {
-            canvas.drawLine(origin.x + i * fieldSize, origin.y, origin.x + i * fieldSize, origin.y + clickField.getTotalHeight() * fieldSize, p);
-        }
-        for (int i = 1; i < clickField.getTotalHeight(); i++) {
-            canvas.drawLine(origin.x, origin.y + fieldSize * i, origin.x + clickField.getTotalWidth() * fieldSize, origin.y + fieldSize * i, p);
-        }
-    }
-
-    private class GestureListener implements GestureDetector.OnGestureListener {
-
-        GameView attachedView;
-        public GestureListener(GameView attachedView) {
-            super();
-            this.attachedView = attachedView;
-        }
-
-        @Override
-        public boolean onSingleTapUp(MotionEvent event) {
-            int[] tapLocation = new int[2];
-            this.attachedView.getLocationInWindow(tapLocation);
-            float tapX = event.getX() - tapLocation[0];
-            float tapY = event.getY() - tapLocation[1];
-            float minX = this.attachedView.drawingOrigin.x;
-            float maxX = minX + this.attachedView.attachedActivity.gameDesk.rowSize() * this.attachedView.fieldSize;
-            float minY = this.attachedView.drawingOrigin.y;
-            float maxY = minY + this.attachedView.attachedActivity.gameDesk.columnSize() * this.attachedView.fieldSize;
-            if (tapX >= minX && tapY >= minY && tapX < maxX && tapY < maxY) {
-                int column = (int) Math.floor((tapX - this.attachedView.drawingOrigin.x) / this.attachedView.fieldSize);
-                int row = (int) Math.floor((tapY - this.attachedView.drawingOrigin.y) / this.attachedView.fieldSize);
-                if (this.attachedView.attachedActivity.gameDesk.doAttempt(ClickField.getSelectedClickField(), row, column)) {
-                    if (this.attachedView.attachedActivity.gameDesk.isCleared()) {
-                        this.attachedView.attachedActivity.showFinished();
-                    }
-                    this.attachedView.invalidate();
-                }
-            }
-            else if (tapY >= this.attachedView.getHeight() * 4 / 5) {
-                if (this.attachedView.clickFieldListVelocity == 0) {
-                    float listXPosition = this.attachedView.clickFieldListPosition + (tapX - this.attachedView.getWidth() / 2) / (float) (this.attachedView.getHeight() / 5);
-                    if (listXPosition >= 0 && listXPosition < ClickField.availableClickFields.length) {
-                        ClickField.selectedClickField = (int) listXPosition;
-                        this.attachedView.postInvalidate();
-                    }
-                }
-                else {
-                    this.attachedView.clickFieldListVelocity = 0;
-                }
+            if (this.attachedActivity.state == PlayState.PLAYING)
+            {
+                this.gestureDetector.onTouchEvent(event);
             }
             return true;
         }
 
-        @Override
-        public void onShowPress(MotionEvent e) {
 
-        }
+        private class GestureListener extends GestureDetector.SimpleOnGestureListener
+        {
 
-        @Override
-        public boolean onDown(MotionEvent e) {
-            return false;
-        }
+            GameView attachedView;
 
-        @Override
-        public void onLongPress(MotionEvent e) {
+            public GestureListener(GameView attachedView)
+            {
+                super();
+                this.attachedView = attachedView;
+            }
 
-        }
-
-        @Override
-        public boolean onScroll(MotionEvent e1, MotionEvent e2, float distanceX, float distanceY) {
-            if (this.isInClickFieldList(e1) && this.isInClickFieldList(e2)) {
-                if ((this.attachedView.clickFieldListPosition == 0 && distanceX < 0) || (this.attachedView.clickFieldListPosition == ClickField.availableClickFields.length && distanceX > 0)) {
-                    return true;
+            @Override
+            public boolean onSingleTapUp(MotionEvent event)
+            {
+                float tapX = event.getX();
+                float tapY = event.getY();
+                float minX = this.attachedView.gridCornerX;
+                float maxX = minX + this.attachedView.tilesInWidth * this.attachedView.tileSize;
+                float minY = this.attachedView.gridCornerY;
+                float maxY = minY + this.attachedView.tilesInHeight * this.attachedView.tileSize;
+                if (tapX >= minX && tapY >= minY && tapX < maxX && tapY < maxY)
+                {
+                    int x = (int) Math.floor((tapX - this.attachedView.gridCornerX) / this.attachedView.tileSize);
+                    int y = (int) Math.floor((tapY - this.attachedView.gridCornerY) / this.attachedView.tileSize);
+                    if (this.attachedView.attachedActivity.gameDesk.doAttempt(ClickField.getSelectedClickField(), x, y))
+                    {
+                        if (this.attachedView.attachedActivity.gameDesk.isCleared())
+                        {
+                            this.attachedView.attachedActivity.finishLevel();
+                        }
+                        this.attachedView.invalidate();
+                    }
                 }
-                this.attachedView.clickFieldListPosition += distanceX / (this.attachedView.getHeight() / 5);
-                if (this.attachedView.clickFieldListPosition < 0) {
-                    this.attachedView.clickFieldListPosition = 0;
+                // click on the prev ClickField
+                else if (tapX >= this.attachedView.prevSelectionStartX && tapX < this.attachedView.prevSelectionStartX + this.attachedView.selectionSquareSize
+                        && tapY >= this.attachedView.prevSelectionStartY && tapY < this.attachedView.prevSelectionStartY + this.attachedView.selectionSquareSize)
+                {
+                    if (ClickField.selectedClickField != 0)
+                    {
+                        ClickField.selectedClickField--;
+                        this.attachedView.animatingFieldChoice = true;
+                        this.attachedView.choiceState = 0;
+                        this.attachedView.choiceFromPrev = true;
+                    }
                 }
-                else if (this.attachedView.clickFieldListPosition > ClickField.availableClickFields.length) {
-                    this.attachedView.clickFieldListPosition = ClickField.availableClickFields.length;
+                // click of the next ClickField
+                else if (tapX >= this.attachedView.nextSelectionStartX && tapX < this.attachedView.nextSelectionStartX + this.attachedView.selectionSquareSize
+                        && tapY >= this.attachedView.nextSelectionStartY && tapY < this.attachedView.nextSelectionStartY + this.attachedView.selectionSquareSize)
+                {
+                    if (ClickField.selectedClickField != ClickField.availableClickFields.length - 1)
+                    {
+                        ClickField.selectedClickField++;
+                        this.attachedView.animatingFieldChoice = true;
+                        this.attachedView.choiceState = 0;
+                        this.attachedView.choiceFromPrev = false;
+                    }
                 }
-                this.attachedView.postInvalidate();
                 return true;
             }
-            return false;
+        }
+    }
+
+    /**
+     * Draws a ClickField as a maximized rectangle in the specified rectangle.
+     * @param clickField the ClickField to draw
+     * @param left left of the rectangle
+     * @param top top of the rectangle
+     * @param right right of the rectangle
+     * @param bottom bottom of the rectangle
+     * @param canvas the canvas to draw on
+     * @param p the paint to draw with
+     */
+    private static void drawClickField(ClickField clickField, int left, int top, int right, int bottom, Canvas canvas, Paint p)
+    {
+        p.setColor(Color.RED);
+
+        // the top left corner of drawing the ClickField
+        int originX;
+        int originY;
+
+        int spaceWidth = right - left;
+        int spaceHeight = bottom - top;
+        int tileWidth = clickField.getTotalWidth();
+        int tileHeight = clickField.getTotalHeight();
+
+        // the size of one drawn tile of the ClickField
+        float fieldSize;
+
+        if (spaceWidth / (float) spaceHeight > tileWidth / (float) tileHeight)
+        {
+            fieldSize = spaceHeight / (float) tileHeight;
+            originX = (int)((spaceWidth - clickField.getTotalWidth() * fieldSize) / 2) + left;
+            originY = top;
+        }
+        else
+        {
+            fieldSize = spaceWidth / (float) tileWidth;
+            originX = left;
+            originY = (int) ((spaceHeight - tileHeight * fieldSize) / 2) + top;
         }
 
-        @Override
-        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY) {
-            if (this.isInClickFieldList(e1) && this.isInClickFieldList(e2)) {
-                this.attachedView.clickFieldListVelocity = -velocityX / 131072;
-                return true;
+        // border between the tiles
+        int border = (int)fieldSize / 10;
+
+        for (int i = 0; i < tileWidth; i++)
+        {
+            for (int j = 0; j < tileHeight; j++)
+            {
+                // whether this is the click position - the green square should be drawn
+                boolean isClickPosition = clickField.getClickX() == i && clickField.getClickY() == j;
+
+                // whether this is a part of the ClickField - it should be drawn red
+                boolean isChangedOnClick = clickField.getInAbsoluteCoordinates(i, j);
+
+                if (isChangedOnClick || isClickPosition)
+                {
+                    int rectStartX = (int) (originX + fieldSize * i);
+                    int rectStartY = (int) (originY + fieldSize * j);
+                    if (isChangedOnClick)
+                    {
+                        Rect rect = new Rect(rectStartX + border, rectStartY + border, rectStartX + (int) fieldSize - border, rectStartY + (int) fieldSize - border);
+                        canvas.drawRect(rect, p);
+                    }
+                    if (isClickPosition)
+                    {
+                        rectStartX += fieldSize / 4;
+                        rectStartY += fieldSize / 4;
+                        p.setColor(Color.GREEN);
+                        canvas.drawRect(rectStartX, rectStartY, rectStartX + fieldSize / 2, rectStartY + fieldSize / 2, p);
+                        p.setColor(Color.RED);
+                    }
+                }
             }
-            return false;
-        }
-
-        private boolean isInClickFieldList(MotionEvent e) {
-            int[] location = new int[2];
-            this.attachedView.getLocationInWindow(location);
-            float y = e.getY() - location[1];
-            return y >= this.attachedView.getHeight() * 4 / 5;
         }
     }
 }

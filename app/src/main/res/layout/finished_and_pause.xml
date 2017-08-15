@@ -35,7 +35,7 @@
         android:layout_height="wrap_content"
         android:text="EXIT"
         android:id="@+id/exitButton"
-        android:layout_alignTop="@+id/nextLevelButton"
+        android:layout_alignTop="@+id/nextLevelOrResumeButton"
         android:layout_alignLeft="@+id/timeText"
         android:layout_alignStart="@+id/timeText"
         android:onClick="exitTheGame"/>
@@ -44,12 +44,12 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="NEXT LEVEL"
-        android:id="@+id/nextLevelButton"
+        android:id="@+id/nextLevelOrResumeButton"
         android:layout_marginTop="39dp"
         android:layout_below="@+id/bestText"
         android:layout_alignRight="@+id/timeText"
         android:layout_alignEnd="@+id/timeText"
-        android:onClick="goToNextLevel"/>
+        android:onClick="nextLevelOrResumePress"/>
 
     <TextView
         android:layout_width="wrap_content"
@@ -67,7 +67,7 @@
         android:layout_height="wrap_content"
         android:text="REPLAY"
         android:id="@+id/replayButton"
-        android:layout_alignTop="@+id/nextLevelButton"
+        android:layout_alignTop="@+id/nextLevelOrResumeButton"
         android:layout_centerHorizontal="true"
         android:onClick="replay"
         android:nestedScrollingEnabled="false" />

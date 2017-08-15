@@ -5,117 +5,198 @@ import android.os.Parcelable;
 
 /**
  * Created by Viktor on 1/22/2016.
+ *
+ * Handles the data about the tile grid shown to the player including the animations.
  */
-public class GameDesk implements Parcelable {
+public class GameDesk implements Parcelable
+{
+    /**
+     * Describes the state of the tiles.
+     * Accessed by states[x + width * y].
+     */
+    public final boolean[] states;
 
-    public boolean[][] states;
+    /**
+     * Describes whether a tile is being animated.
+     * Accessed by animating[x + width * y]
+     */
+    public final boolean[] animating;
 
-    public GameDesk(int rowSize, int columnSize) {
-        this.states = new boolean[columnSize][rowSize];
+    /**
+     * The width of the desk - the number of tiles in the x direction.
+     */
+    public final int width;
+
+    /**
+     * The height of the desk - the number of tiles in the y direction.
+     */
+    public final int height;
+
+    /**
+     * Indicates whether some tiles are currently animated.
+     * Should be set back to false when the animationLength is over while drawing.
+     */
+    public boolean isAnimating;
+
+    /**
+     * The time (from System.currentTimeMillis()) of when the animation began.
+     */
+    public long animationBegin;
+
+    /**
+     * The number of milliseconds the animation should last.
+     */
+    public static final int animationLength = 200;
+
+    public GameDesk(int width, int height)
+    {
+        this.width = width;
+        this.height = height;
+        this.states = new boolean[width * height];
+        this.animating = new boolean[width * height];
     }
 
-    private GameDesk(boolean[][] states) {
-        this.states = states;
+    /**
+     * Constructs a new GameDesk with the specified tile states.
+     * Copies the states into a new array, so the passed array remains unchanged.
+     * @param width width of the tile grid
+     * @param height height of the tile grid
+     * @param states the states for the new GameDesk
+     */
+    public GameDesk(int width, int height, boolean[] states)
+    {
+        this.width = width;
+        this.height = height;
+        this.states = new boolean[this.width * this.height];
+        System.arraycopy(states, 0, this.states, 0, width * height);
+        this.animating = new boolean[this.width * this.height];
     }
 
-    public int rowSize() {
-        return states[0].length;
+    /**
+     * @param x the x coordinate of the tile
+     * @param y the y coordinate of the tile
+     * @return the state of the tile at the specified coordinates
+     */
+    public boolean state(int x, int y)
+    {
+        return this.states[x + this.width * y];
     }
 
-    public int columnSize() {
-        return states.length;
-    }
+    /**
+     * Checks whether applying a ClickField at a specified location is valid.
+     * If yes, applies the ClickField which results in changing the state of the corresponding tiles and starting an animation.
+     * In no, does nothing.
+     * @param field the ClickField to apply
+     * @param x the x coordinate of the tile to apply the field on
+     * @param y the y coordinate of the tile to apply the field on
+     * @return whether the application was valid - whether the ClickField was applied
+     */
+    public boolean doAttempt(ClickField field, int x, int y)
+    {
+        // get the size of the ClickField
+        int fieldMinX = field.getMinX();
+        int fieldMinY = field.getMinY();
+        int fieldMaxX = field.getMaxX();
+        int fieldMaxY = field.getMaxY();
 
-    public static final Parcelable.Creator<GameDesk> CREATOR
-            = new Parcelable.Creator<GameDesk>() {
-        public GameDesk createFromParcel(Parcel in) {
-            return new GameDesk(in);
+        // check whether the application is valid
+        if (x + fieldMinX < 0 || y + fieldMinY < 0 || x + fieldMaxX >= this.width || y + fieldMaxY >= this.height)
+        {
+            return false;
         }
 
-        public GameDesk[] newArray(int size) {
-            return new GameDesk[size];
+        // begin the animation
+        this.isAnimating = true;
+        this.animationBegin = System.currentTimeMillis();
+
+        // clear any old animations
+        for (int i = 0, n = this.width * this.height; i < n; i++)
+        {
+            this.animating[i] = false;
         }
-    };
+
+        // apply the ClickField - change the state and animation state of the corresponding tiles
+        for (int i = fieldMinX; i <= fieldMaxX; i++)
+        {
+            for (int j = fieldMinY; j <= fieldMaxY; j++)
+            {
+                if (field.getInClickCoordinates(i, j))
+                {
+                    int index = (i + x) + this.width * (j + y);
+                    this.states[index] = !this.states[index];
+                    this.animating[index] = true;
+                }
+            }
+        }
+        return true;
+    }
+
+    /**
+     * @return whether all fields are cleared - the level is complete
+     */
+    public boolean isCleared()
+    {
+        for (int i = 0, n = this.width * this.height; i < n; i++)
+        {
+            if (this.states[i])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // parcelling implementation here and under
+
+    protected GameDesk(Parcel in)
+    {
+        this.states = in.createBooleanArray();
+        this.width = in.readInt();
+        this.height = in.readInt();
+        this.isAnimating = in.readByte() != 0;
+        if (this.isAnimating)
+        {
+            this.animationBegin = in.readLong();
+            this.animating = in.createBooleanArray();
+        }
+        else
+        {
+            this.animating = new boolean[this.width * this.height];
+        }
+    }
 
     @Override
-    public int describeContents() {
+    public void writeToParcel(Parcel dest, int flags)
+    {
+        dest.writeBooleanArray(this.states);
+        dest.writeInt(this.width);
+        dest.writeInt(this.height);
+        dest.writeByte((byte) (this.isAnimating ? 1 : 0));
+        if (this.isAnimating)
+        {
+            dest.writeLong(this.animationBegin);
+            dest.writeBooleanArray(this.animating);
+        }
+    }
+
+    @Override
+    public int describeContents()
+    {
         return 0;
     }
 
-    @Override
-    public void writeToParcel(Parcel dest, int flags) {
-        dest.writeInt(this.states.length);
-        dest.writeInt(this.states[0].length);
-        for (int i = 0; i < this.states.length; i++) {
-            dest.writeBooleanArray(this.states[i]);
+    public static final Creator<GameDesk> CREATOR = new Creator<GameDesk>()
+    {
+        @Override
+        public GameDesk createFromParcel(Parcel in)
+        {
+            return new GameDesk(in);
         }
-    }
 
-    public GameDesk(Parcel in) {
-        this.states = new boolean[in.readInt()][];
-        int length = in.readInt();
-        for (int i = 0; i < this.states.length; i++) {
-            this.states[i] = new boolean[length];
-            in.readBooleanArray(this.states[i]);
+        @Override
+        public GameDesk[] newArray(int size)
+        {
+            return new GameDesk[size];
         }
-    }
-
-    public GameDesk(boolean[] semiStates, int rowSize) {
-        this.states = new boolean[semiStates.length / rowSize][rowSize];
-        int row = 0;
-        int column = 0;
-        for (int i = 0; i < semiStates.length; i++) {
-            this.states[row][column] = semiStates[i];
-            column++;
-            if (column == rowSize) {
-                row++;
-                column = 0;
-            }
-        }
-    }
-
-    public boolean[] asArray() {
-        boolean[] array = new boolean[this.rowSize() * this.columnSize()];
-        for (int i = 0; i < this.columnSize(); i++) {
-            for (int j = 0; j < this.rowSize(); j++) {
-                array[j + i * this.rowSize()] = this.states[i][j];
-            }
-        }
-        return array;
-    }
-
-    public boolean doAttempt(ClickField field, int row, int column) {
-        if (column + field.getMinX() < 0 || row + field.getMinY() < 0 || column + field.getMaxX() >= this.rowSize() || row + field.getMaxY() >= this.columnSize()) {
-            return false;
-        }
-        for (int i = field.getMinX(); i <= field.getMaxX(); i++) {
-            for (int j = field.getMinY(); j <= field.getMaxY(); j++) {
-                if (field.getInClickCoordinates(i, j)) {
-                    this.states[row + j][column + i] = !this.states[row + j][column + i];
-                }
-            }
-        }
-        return true;
-    }
-
-    public GameDesk clone() {
-        boolean[][] newStates = new boolean[this.states.length][this.states[0].length];
-        for (int i = 0; i < newStates.length; i++) {
-            for (int j = 0; j < newStates[0].length; j++) {
-                newStates[i][j] = this.states[i][j];
-            }
-        }
-        return new GameDesk(newStates);
-    }
-
-    public boolean isCleared() {
-        for (int i = 0; i < this.states.length; i++) {
-            for (int j = 0; j < this.states[0].length; j++) {
-                if (this.states[i][j]) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
+    };
 }
