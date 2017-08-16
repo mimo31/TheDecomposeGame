@@ -121,7 +121,7 @@ public class ClickField
      */
     public static void initializeClickFields()
     {
-        allClickFields = new ClickField[9];
+        allClickFields = new ClickField[12];
 
         allClickFields[0] = new ClickField(new boolean[]{
                 true, true,
@@ -136,5 +136,8 @@ public class ClickField
         allClickFields[6] = new ClickField(new boolean[]{true, false, false, false, false, true, false, false, false, false, true, false, false, false, false, true}, 4, 4, 1, 1);
         allClickFields[7] = new ClickField(new boolean[]{false, false, true, false, true, true, true, false, false, true, true, true, false, true, false, false}, 4, 4, 1, 1);
         allClickFields[8] = new ClickField(new boolean[]{false, false, false, true, false, false, true, true, false, true, true, true, true, true, true, true}, 4, 4, 1, 1);
+        allClickFields[9] = new ClickField(new boolean[]{false, false, true, true, false, false, true, false, false}, 3, 3, 1, 1);
+        allClickFields[10] = new ClickField(new boolean[]{true, true, false, true, false, false, false, false, false, false, false, false, true, false, false, true}, 4, 4, 1, 1);
+        allClickFields[11] = new ClickField(new boolean[]{false, true, false, false, true, false, true, true, true}, 3, 3, 1, 1);
     }
 }

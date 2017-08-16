@@ -66,16 +66,16 @@ public class IO
                 // read maxLevel
                 Level.maxLevel = dataInput.readInt();
 
-                // the maxLevel level is already completed and a next level is available, increment maxLevel
-                if (Level.bestTimes[Level.maxLevel] != 0 && Level.maxLevel != Level.levels.length - 1)
-                {
-                    Level.maxLevel++;
-                }
-
                 // read the best times
                 for (int i = 0; i < Level.maxLevel + 1; i++)
                 {
                     Level.bestTimes[i] = dataInput.readInt();
+                }
+
+                // the maxLevel level is already completed and a next level is available, increment maxLevel
+                if (Level.bestTimes[Level.maxLevel] != 0 && Level.maxLevel != Level.levels.length - 1)
+                {
+                    Level.maxLevel++;
                 }
 
                 dataInput.close();

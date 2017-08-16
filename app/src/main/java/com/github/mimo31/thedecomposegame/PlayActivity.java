@@ -165,8 +165,16 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     protected void onStop()
     {
         super.onStop();
-        this.plane.getCloseReady();
+        this.plane.keepUpdating = false;
         IO.saveData(this.getApplicationContext());
+    }
+
+    @Override
+    protected void onStart()
+    {
+        super.onStart();
+        this.plane.keepUpdating = true;
+        this.plane.updateHandler.postDelayed(this.plane, 17);
     }
 
     @Override
@@ -448,7 +456,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
 
         private PlayActivity attachedActivity;
         private GestureDetectorCompat gestureDetector;
-        private boolean keepUpdating = true;
+        private boolean keepUpdating = false;
         private Handler updateHandler = new Handler();
         private final int backgroundColor = Color.rgb(220, 220, 220);
         private final int selectionDialogSelectedColor = Color.rgb(100, 0, 180);
@@ -642,7 +650,6 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             this.attachedActivity = playActivity;
             this.setBackgroundColor(backgroundColor);
             this.gestureDetector = new GestureDetectorCompat(this.attachedActivity.getApplicationContext(), new GestureListener(this));
-            this.updateHandler.postDelayed(this, 17);
         }
 
         /**
