@@ -71,10 +71,10 @@ public class StartActivity extends AppCompatActivity
 
     private static class WelcomeView extends View implements Runnable
     {
-        private StartActivity activity;
-        private GestureDetectorCompat gestureDetector;
+        private final StartActivity activity;
+        private final GestureDetectorCompat gestureDetector;
 
-        private Handler updateHandler = new Handler();
+        private final Handler updateHandler = new Handler();
 
         private boolean keepUpdating = true;
 
@@ -124,10 +124,10 @@ public class StartActivity extends AppCompatActivity
         private int borderSize;
 
         // a Path object used for tile change animations
-        private Path animationPath;
+        private final Path animationPath = new Path();
 
         // the Paint object used for drawing
-        private Paint p;
+        private final Paint p = new Paint();
 
         // the StringDrawData objects for the texts on the play and help buttons
         private StringDraw.StringDrawData playDrawData;
@@ -144,6 +144,7 @@ public class StartActivity extends AppCompatActivity
         {
             super(activity.getApplicationContext());
             this.activity = activity;
+            this.setId(0);
             this.gestureDetector = new GestureDetectorCompat(activity.getApplicationContext(), new GestureListener(this));
         }
 
@@ -164,9 +165,6 @@ public class StartActivity extends AppCompatActivity
 
             this.borderSize = this.tileSize / 16;
 
-            this.p = new Paint();
-
-            this.animationPath = new Path();
             this.animationPath.setFillType(Path.FillType.EVEN_ODD);
 
             this.playButton = new Rect(0, this.tileSize + this.borderSize, this.width, this.tileSize * 2 - this.borderSize);
@@ -328,7 +326,7 @@ public class StartActivity extends AppCompatActivity
         private static class GestureListener extends GestureDetector.SimpleOnGestureListener
         {
 
-            private WelcomeView attachedView;
+            private final WelcomeView attachedView;
 
             private GestureListener(WelcomeView attachedView)
             {

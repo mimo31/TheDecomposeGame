@@ -41,7 +41,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     public static final int badColor = Color.RED;
 
     // handles the updating of animation in the Activity
-    private Handler updateHandler = new Handler();
+    private final Handler updateHandler = new Handler();
 
     // if we are currently counting the time to the time taken by the user for the level, this value is the time when we started the counting
     // the total time taken up to this point is then System.currentTimeMillis() - timerLastStart + millisTaken
@@ -454,10 +454,10 @@ public class PlayActivity extends AppCompatActivity implements Runnable
     private class GameView extends View implements Runnable
     {
 
-        private PlayActivity attachedActivity;
-        private GestureDetectorCompat gestureDetector;
+        private final PlayActivity attachedActivity;
+        private final GestureDetectorCompat gestureDetector;
         private boolean keepUpdating = false;
-        private Handler updateHandler = new Handler();
+        private final Handler updateHandler = new Handler();
         private final int backgroundColor = Color.rgb(220, 220, 220);
         private final int selectionDialogSelectedColor = Color.rgb(100, 0, 180);
         private final int selectionDialogNotSelectedColor = Color.rgb(200, 0, 255);
@@ -466,7 +466,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
         private float choiceState = 0;
         private boolean choiceFromPrev;
 
-        private Paint p = new Paint();
+        private final Paint p = new Paint();
 
         // width and height of the whole view
         private int width;
@@ -662,14 +662,6 @@ public class PlayActivity extends AppCompatActivity implements Runnable
             {
                 this.updateHandler.postDelayed(this, 17);
             }
-        }
-
-        /**
-         * Unbinds any resources, gets ready for destroying - stops updating.
-         */
-        public void getCloseReady()
-        {
-            this.keepUpdating = false;
         }
 
         /**
@@ -895,7 +887,7 @@ public class PlayActivity extends AppCompatActivity implements Runnable
         private class GestureListener extends GestureDetector.SimpleOnGestureListener
         {
 
-            GameView attachedView;
+            final GameView attachedView;
 
             public GestureListener(GameView attachedView)
             {

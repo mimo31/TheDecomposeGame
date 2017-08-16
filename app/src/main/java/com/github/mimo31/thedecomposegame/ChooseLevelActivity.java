@@ -61,8 +61,8 @@ public class ChooseLevelActivity extends AppCompatActivity
     private static class LevelListView extends View
     {
 
-        ChooseLevelActivity attachedActivity;
-        GestureDetectorCompat gestureDetector;
+        final ChooseLevelActivity attachedActivity;
+        final GestureDetectorCompat gestureDetector;
 
         // position of the list with levels
         // this value is the distance from the top of the list to the top of the current view (in level heights)
@@ -224,7 +224,7 @@ public class ChooseLevelActivity extends AppCompatActivity
     private static class GestureListener extends GestureDetector.SimpleOnGestureListener
     {
 
-        private LevelListView attachedView;
+        private final LevelListView attachedView;
 
         private GestureListener(LevelListView attachedView)
         {

@@ -412,9 +412,9 @@ public class StringDraw
      */
     static class StringDrawData
     {
-        private int x;
-        private int y;
-        private float size;
+        private final int x;
+        private final int y;
+        private final float size;
 
         private StringDrawData(int x, int y, float size)
         {

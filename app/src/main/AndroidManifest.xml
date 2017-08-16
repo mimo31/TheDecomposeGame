@@ -1,8 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.github.mimo31.thedecomposegame"
-    android:versionCode="2"
-    android:versionName="1.1">
+    >
 
     <application
         android:name="com.github.mimo31.thedecomposegame.App"
@@ -17,9 +16,9 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-        <activity android:name=".PlayActivity" android:parentActivityName=".StartActivity" ></activity>
-        <activity android:name=".ChooseLevelActivity" android:parentActivityName=".StartActivity" android:hardwareAccelerated="false" />
-        <activity android:name=".HelpActivity" android:parentActivityName=".StartActivity" />
+        <activity android:name=".PlayActivity" />
+        <activity android:name=".ChooseLevelActivity" />
+        <activity android:name=".HelpActivity" />
     </application>
 
 </manifest>
